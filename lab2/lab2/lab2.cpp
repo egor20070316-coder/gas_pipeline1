@@ -161,123 +161,112 @@ bool has_id(const vector<int>& ids, int id) {
 	return false;
 }
 
-void printKS(const KS& ks)
-{
-	cout << endl;
-	cout << "КС" << endl;
-	cout << "Название: " << ks.name << endl;
-	cout << "Цех: " << ks.ceh << endl;
-	cout << "Работа: " << ks.work << endl;
-	cout << "Класс: " << ks.klass << endl;
+
+
+vector<int> ids = choose_ids(found);
+if (ids.empty()) {
+	cout << "Не выбрано ни одного объекта.\n";
+	return;
 }
 
-void editKS(KS& ks)
-{
-	int x;
-
-	cout << "1. Запустить цех" << endl;
-	cout << "2. Остановить цех" << endl;
-	cout << "Выберите";
-	cin >> x;
-
-	while (cin.fail() || (x != 1 && x != 2))
-	{
-		cout << "Ошибка, введите 1 или 2!";
-		cin.clear();
-		cin.ignore(1000, '\n');
-		cin >> x;
-	}
-	if (x == 1)
-	{
-		if (ks.work < ks.ceh)
-		{
-			ks.work = ks.work + 1;
-			cout << "Цех запущен" << endl;
-		}
-		else
-			cout << "Все цеха работают" << endl;
-	}
-	if (x == 2)
-	{
-		if (ks.work > 0)
-		{
-			ks.work = ks.work - 1;
-			cout << "Цех остановлен" << endl;
-		}
-		else
-			cout << "Все цеха уже остановлены" << endl;
-	}
+if (action == 1) {
+	cout << "Новый статус: 1 — в работе, 0 — в ремонте: ";
+	bool working = (get_int(0, 1) == 1);
+	for (int id : ids) pipes.at(id).set_work(working);
+	cout << "Изменено труб: " << ids.size() << '\n';
+	write_log("Изменение статуса труб: " + to_string(ids.size()));
+}
+else {
+	for (int id : ids) pipes.erase(id);
+	cout << "Удалено труб: " << ids.size() << '\n';
+	write_log("Удаление труб: " + to_string(ids.size()));
+}
 }
 
-void saveTruba(ofstream& file, Truba& truba)
-{
-	file << truba.km << endl;
-	file << truba.dlina << endl;
-	file << truba.d << endl;
-	file << truba.remont << endl;;
-}
+void edit_cs(unordered_map<int, Cs>& stations) {
+	vector<int> found = find_cs(stations);
+	if (found.empty()) return;
 
-void loadTruba(ifstream& file, Truba& truba)
-{
-	file >> truba.km;
-	file >> truba.dlina;
-	file >> truba.d;
-	file >> truba.remont;
-}
+	cout << "1. Редактировать\n2. Удалить\n0. Отмена\nВыберите: ";
+	int action = get_int(0, 2);
+	if (action == 0) return;
 
-void saveKS(ofstream& file, KS& ks)
-{
-	file << ks.name << endl;
-	file << ks.ceh << endl;
-	file << ks.work << endl;
-	file << ks.klass << endl;
-}
-
-void loadKS(ifstream& file, KS& ks)
-{
-	file >> ks.name;
-	file >> ks.ceh;
-	file >> ks.work;
-	file >> ks.klass;
-}
-
-void save(Truba truba, KS ks, bool hasTruba, bool hasKS)
-{
-	ofstream file("data.txt");
-	file << hasTruba << endl;
-	file << hasKS << endl;
-	if (!hasTruba && !hasKS)
-	{
-		cout << "Данных не найдено" << endl;
-		return;
-	}
-	if (hasTruba)
-		saveTruba(file, truba);
-
-	if (hasKS)
-		saveKS(file, ks);
-
-	file.close();
-	cout << "Данные сохранены" << endl;
-}
-
-void load(Truba& truba, KS& ks, bool& hasTruba, bool& hasKS)
-{
-	ifstream file("data.txt");
-	if (!file)
-	{
-		cout << "Файл не найден" << endl;
+	vector<int> ids = choose_ids(found);
+	if (ids.empty()) {
+		cout << "Не выбрано ни одного объекта.\n";
 		return;
 	}
 
-	file >> hasTruba;
-	file >> hasKS;
-	if (hasTruba)
-		loadTruba(file, truba);
-	if (hasKS)
-		loadKS(file, ks);
-	file.close();
-	cout << "Данные сохранены" << endl;
+	if (action == 1) {
+		cout << "1. Запустить цех\n2. Остановить цех\nВыберите: ";
+		int command = get_int(1, 2);
+		for (int id : ids) {
+			cout << "КС ID: " << id << '\n';
+			stations.at(id).edit(command);
+		}
+		cout << "Обработано КС: " << ids.size() << '\n';
+		write_log("Редактирование КС: " + to_string(ids.size()));
+	}
+	else {
+		for (int id : ids) stations.erase(id);
+		cout << "Удалено КС: " << ids.size() << '\n';
+		write_log("Удаление КС: " + to_string(ids.size()));
+	}
+}
+
+void add_pipe(GTS& gts) {
+	cout << "Введите километровую отметку (название): ";
+	string name = get_name();
+
+	cout << "Введите длину (км, больше нуля): ";
+	double length = get_double(0, numeric_limits<double>::max());
+	while (length == 0) {
+		cout << "Длина должна быть больше нуля: ";
+		length = get_double(0, numeric_limits<double>::max());
+	}
+
+	cout << "Введите диаметр (мм): ";
+	int diameter = get_int(1, numeric_limits<int>::max());
+
+	Pipe pipe;
+	pipe.set_name(name);
+	pipe.set_len(length);
+	pipe.set_diametr(diameter);
+	pipe.set_work(true);
+	gts.add_pipes(pipe);
+
+	cout << "Труба добавлена!\n";
+	write_log("Добавлена новая труба");
+}
+
+void add_cs(GTS& gts) {
+	cout << "Введите название КС: ";
+	string name = get_name();
+	cout << "Введите общее количество цехов: ";
+	int total = get_int(1, numeric_limits<int>::max());
+	cout << "Введите количество цехов в работе: ";
+	int working = get_int(0, total);
+
+	cout << "Введите класс станции (A, B, C, D, E): ";
+	char station_class;
+	while (true) {
+		string text = read_line();
+		if (text.size() == 1) {
+			station_class = static_cast<char>(
+				toupper(static_cast<unsigned char>(text[0])));
+			if (station_class >= 'A' && station_class <= 'E') break;
+		}
+		cout << "Введите одну латинскую букву от A до E: ";
+	}
+
+	Cs station;
+	station.set_name(name);
+	station.set_shops(total, working);
+	station.set_class(station_class);
+	gts.add_css(station);
+
+	cout << "КС добавлена!\n";
+	write_log("Добавлена новая КС");
 }
 
 int  main()
