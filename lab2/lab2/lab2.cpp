@@ -2,144 +2,163 @@
 //
 
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <windows.h>
+#include <fstream>
+#include <sstream>
+#include <unordered_map>
+#include <vector>
+#include <cctype>
+#include <clocale>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
+
+#include "gts.hpp"
+#include "pipe.hpp"
+#include "cs_station.hpp"
 
 using namespace std;
 
-struct Truba
-{
-	string km;
-	double dlina;
-	int d;
-	bool remont = 0;
-};
+string read_line() {
+	string text;
+	if (!getline(cin, text)) {
+		throw runtime_error("Ввод завершён.");
+	}
+	return text;
+}
 
-struct KS
-{
-	string name;
-	int ceh;
-	int work;
-	int klass;
-};
 
-void inputTruba(Truba& truba)
-
-{
-	cin.ignore(100, '\n');
-	cout << "Введите км: ";
-	getline(cin, truba.km);
-
-	bool flag = true;
-	while (flag)
-	{
-		flag = false;
-
-		if (truba.km.empty() || truba.km[0] == '0' || truba.km[0] == '-' || truba.km[0] == '+' || truba.km[0] == ' ')
-		{
-			flag = true;
+int get_int(int min_value, int max_value) {
+	while (true) {
+		stringstream input(read_line());
+		int number;
+		char extra;
+		if (input >> number && !(input >> extra) &&
+			number >= min_value && number <= max_value) {
+			return number;
 		}
+		cout << "Введите целое число от " << min_value
+			<< " до " << max_value << ": ";
+	}
+}
 
-		for (int i = 0; i < truba.km.length(); i++)
-		{
-			if (truba.km[i] < '0' || truba.km[i] > '9')
-			{
-				flag = true;
-				break;
+double get_double(double min_value, double max_value) {
+	while (true) {
+		stringstream input(read_line());
+		double number;
+		char extra;
+		if (input >> number && !(input >> extra) && isfinite(number) &&
+			number >= min_value && number <= max_value) {
+			return number;
+		}
+		cout << "Некорректное число. Повторите ввод (дробь через точку): ";
+	}
+}
+
+string get_name() {
+	while (true) {
+		string name = read_line();
+		for (char c : name) {
+			if (c != ' ' && c != '\t' && c != '\r') return name;
+		}
+		cout << "Строка не должна быть пустой. Повторите: ";
+	}
+}
+
+void write_log(const string& message) {
+	ofstream file("log.txt", ios::app);
+	if (file) file << message << '\n';
+}
+
+bool find_name(string name, string part) {
+	for (char& c : name) {
+		c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+	}
+	for (char& c : part) {
+		c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+	}
+	return name.find(part) != string::npos;
+}
+
+vector<int> find_pipes(const unordered_map<int, Pipe>& pipes) {
+	vector<int> ids;
+	if (pipes.empty()) {
+		cout << "Труб пока нет.\n";
+		return ids;
+	}
+
+	cout << "1. По наименованию\n2. По признаку 'в ремонте'\nВыберите: ";
+	int filter = get_int(1, 2);
+	if (filter == 1) {
+		cout << "Введите название или его часть: ";
+		string name = read_line();
+		for (const auto& item : pipes) {
+			if (find_name(item.second.get_name(), name)) {
+				ids.push_back(item.first);
 			}
 		}
-		if (flag)
-		{
-			cout << "Ошибка, введите только цифры и без пробелов";
-			getline(cin, truba.km);
+	}
+	else {
+		cout << "1. В ремонте\n2. В работе\nВыберите: ";
+		bool repair = (get_int(1, 2) == 1);
+		for (const auto& item : pipes) {
+			if (item.second.is_in_repair() == repair) {
+				ids.push_back(item.first);
+			}
 		}
 	}
-	cout << "Введите длину: ";
-	cin >> truba.dlina;
 
-	while (cin.fail() || truba.dlina <= 0 || cin.peek() != '\n')
-	{
-		cin.clear();
-		cin.ignore(1000, '\n');
-		cout << "Ошибка, введите одно положительное число!";
-		cin >> truba.dlina;
+	cout << "Найдено труб: " << ids.size() << '\n';
+	for (int id : ids) {
+		cout << "ID: " << id << '\n';
+		pipes.at(id).print();
 	}
-
-	cout << "Введите диаметр: ";
-	cin >> truba.d;
-
-	while (cin.fail() || truba.d <= 0 || cin.peek() != '\n')
-	{
-		cin.clear();
-		cin.ignore(1000, '\n');
-		cout << "Ошибка, введите положительное число!" << endl;
-
-		cin >> truba.d;
-	}
+	write_log("Поиск труб. Найдено: " + to_string(ids.size()));
+	return ids;
 }
 
-void printTruba(const Truba& truba)
-{
-	cout << "Км: " << truba.km << endl;
-	cout << "Длина: " << truba.dlina << endl;
-	cout << "Диаметр: " << truba.d << endl;
-	cout << "Ремонт" << (truba.remont ? "Да" : "Нет") << endl;
+vector<int> find_cs(const unordered_map<int, Cs>& stations) {
+	vector<int> ids;
+	if (stations.empty()) {
+		cout << "КС пока нет.\n";
+		return ids;
+	}
+
+	cout << "1. По наименованию\n2. По проценту незадействованных цехов\nВыберите: ";
+	int filter = get_int(1, 2);
+	if (filter == 1) {
+		cout << "Введите название или его часть: ";
+		string name = read_line();
+		for (const auto& item : stations) {
+			if (find_name(item.second.get_name(), name)) {
+				ids.push_back(item.first);
+			}
+		}
+	}
+	else {
+		cout << "Минимальный процент незадействованных цехов (0..100): ";
+		double percent = get_double(0, 100);
+		for (const auto& item : stations) {
+			if (item.second.get_percentage() >= percent) {
+				ids.push_back(item.first);
+			}
+		}
+	}
+
+	cout << "Найдено КС: " << ids.size() << '\n';
+	for (int id : ids) {
+		cout << "ID: " << id << '\n';
+		stations.at(id).print();
+	}
+	write_log("Поиск КС. Найдено: " + to_string(ids.size()));
+	return ids;
 }
 
-void editTruba(Truba& truba)
-{
-	int x;
-	cout << "Введите ремонт(1 - да, 0 - нет) : " << endl;
-	cin >> x;
-	while (cin.fail() || x != 0 && x != 1)
-	{
-		cout << "Ошибка, введите число!" << endl;
-		cin.clear();
-		cin.ignore(1000, '\n');
-		cin >> x;
+bool has_id(const vector<int>& ids, int id) {
+	for (int current_id : ids) {
+		if (current_id == id) return true;
 	}
-	truba.remont = x;
-}
-
-void inputKS(KS& ks)
-{
-	cout << "Введите название: ";
-	cin.ignore(1000, '\n');
-	getline(cin, ks.name);
-
-	cout << "Введите цех: ";
-	cin >> ks.ceh;
-	while (cin.fail() || ks.ceh <= 0 || cin.peek() != '\n')
-	{
-		cin.clear();
-		cin.ignore(1000, '\n');
-		cout << "Ошибка, введите положительное число!" << endl;
-
-		cin >> ks.ceh;
-	}
-
-	cout << "Введите работу: ";
-	cin >> ks.work;
-	while (cin.fail() || ks.work < 0 || cin.peek() != '\n')
-	{
-		cin.clear();
-		cin.ignore(1000, '\n');
-		cout << "Ошибка, введите число!" << endl;
-
-		cin >> ks.work;
-	}
-
-	cout << "Введите класс: ";
-	cin >> ks.klass;
-	while (cin.fail() || ks.klass <= 0 || cin.peek() != '\n')
-	{
-		cin.clear();
-		cin.ignore(1000, '\n');
-		cout << "Ошибка, введите положительное число!" << endl;
-
-		cin >> ks.klass;
-	}
+	return false;
 }
 
 void printKS(const KS& ks)
